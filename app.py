@@ -1,228 +1,92 @@
 import streamlit as st
 import random
+import time
 
-# -----------------------------
-# Dados iniciais (mock)
-# -----------------------------
-LIGAS = ["Série A", "Série B", "Série C", "Série D"]
-ESTADUAIS = ["Paulista", "Carioca", "Mineiro", "Gaúcho"]
-
-TIMES_BASE = [
-    {"nome": "Flamengo", "liga": "Série A", "estado": "Carioca"},
-    {"nome": "Palmeiras", "liga": "Série A", "estado": "Paulista"},
-    {"nome": "Corinthians", "liga": "Série A", "estado": "Paulista"},
-    {"nome": "Vasco", "liga": "Série B", "estado": "Carioca"},
-    {"nome": "Cruzeiro", "liga": "Série B", "estado": "Mineiro"},
-    {"nome": "Grêmio", "liga": "Série A", "estado": "Gaúcho"},
+# Times mockados
+teams = [
+    {'id': 1, 'nome': 'XV de Python', 'ataque': 72, 'defesa': 68, 'meio': 70},
+    {'id': 2, 'nome': 'Streamlit FC', 'ataque': 69, 'defesa': 66, 'meio': 71},
+    {'id': 3, 'nome': 'Data United', 'ataque': 65, 'defesa': 70, 'meio': 67},
+    {'id': 4, 'nome': 'AI Warriors', 'ataque': 75, 'defesa': 60, 'meio': 72},
 ]
 
-JOGADORES_BASE = [
-    {"nome": "Jogador 1", "pos": "ATA", "overall": 78, "salario": 300_000},
-    {"nome": "Jogador 2", "pos": "MEI", "overall": 75, "salario": 250_000},
-    {"nome": "Jogador 3", "pos": "ZAG", "overall": 72, "salario": 200_000},
-    {"nome": "Jogador 4", "pos": "LAT", "overall": 70, "salario": 180_000},
-    {"nome": "Jogador 5", "pos": "GOL", "overall": 74, "salario": 220_000},
-]
+def calcular_forca(time):
+    return time['ataque'] * 0.4 + time['meio'] * 0.35 + time['defesa'] * 0.25
 
-# -----------------------------
-# Estado da aplicação
-# -----------------------------
-if "clube" not in st.session_state:
-    st.session_state.clube = None
+def simular_partida(casa, fora):
+    gols_casa = 0
+    gols_fora = 0
+    eventos = []
 
-if "financas" not in st.session_state:
-    st.session_state.financas = {
-        "caixa": 50_000_000,
-        "receita_tv": 5_000_000,
-        "receita_bilheteria": 1_000_000,
-        "patrocinios": 3_000_000,
-        "despesa_salarios": 0,
-        "despesa_outros": 1_000_000,
-    }
+    forca_casa = calcular_forca(casa)
+    forca_fora = calcular_forca(fora)
 
-if "elenco" not in st.session_state:
-    st.session_state.elenco = []
+    for minuto in range(1, 91):
+        caos = random.random()
 
-if "historico_partidas" not in st.session_state:
-    st.session_state.historico_partidas = []
+        chance_casa = min(max((forca_casa + 8) / 2200 + caos * 0.01, 0.01), 0.12)
+        chance_fora = min(max(forca_fora / 2200 + (1 - caos) * 0.008, 0.01), 0.11)
 
-# -----------------------------
-# Funções de lógica
-# -----------------------------
-def inicializar_clube(nome_clube):
-    clube = next((t for t in TIMES_BASE if t["nome"] == nome_clube), None)
-    if not clube:
-        return
+        if random.random() < chance_casa:
+            gols_casa += 1
+            eventos.append(f"GOL DO {casa['nome'].upper()} aos {minuto} minutos!")
 
-    st.session_state.clube = clube
-    # Clona jogadores base pro elenco
-    elenco = []
-    for j in JOGADORES_BASE:
-        jogador = j.copy()
-        jogador["clube"] = clube["nome"]
-        elenco.append(jogador)
-    st.session_state.elenco = elenco
+        if random.random() < chance_fora:
+            gols_fora += 1
+            eventos.append(f"GOL DO {fora['nome'].upper()} aos {minuto} minutos!")
 
-    # Calcula despesa de salários
-    total_salarios = sum(j["salario"] for j in elenco)
-    st.session_state.financas["despesa_salarios"] = total_salarios
+        if random.random() < 0.018:
+            eventos.append(f"Cartão amarelo aos {minuto} minutos. Entrada criminosa, porém futebolística.")
 
+        if random.random() < 0.008:
+            eventos.append(f"Lesão aos {minuto} minutos. A coxa foi de arrasta.")
 
-def simular_partida(adversario_nome: str):
-    if not st.session_state.clube:
-        st.warning("Escolha um clube primeiro.")
-        return
+    return gols_casa, gols_fora, eventos
 
-    clube = st.session_state.clube["nome"]
-    overall_clube = sum(j["overall"] for j in st.session_state.elenco) / len(st.session_state.elenco)
-    overall_adv = random.randint(65, 80)
+st.title('Brasfoot Classic - Simulador de Partidas')
 
-    fator_random = random.uniform(-5, 5)
-    score_clube = max(0, int((overall_clube + fator_random) // 10))
-    score_adv = max(0, int((overall_adv - fator_random) // 10))
+st.sidebar.header('Escolha os times')
+nomes_times = [t['nome'] for t in teams]
 
-    resultado = "Empate"
-    if score_clube > score_adv:
-        resultado = "Vitória"
-        st.session_state.financas["caixa"] += 500_000
-        st.session_state.financas["receita_bilheteria"] += 200_000
-    elif score_clube < score_adv:
-        resultado = "Derrota"
-        st.session_state.financas["caixa"] -= 200_000
+time_casa_nome = st.sidebar.selectbox('Time da casa', nomes_times, index=0)
+time_fora_nome = st.sidebar.selectbox('Time visitante', nomes_times, index=1)
 
-    partida = {
-        "mandante": clube,
-        "visitante": adversario_nome,
-        "gols_mandante": score_clube,
-        "gols_visitante": score_adv,
-        "resultado": resultado,
-    }
-    st.session_state.historico_partidas.append(partida)
+time_casa = next(t for t in teams if t['nome'] == time_casa_nome)
+time_fora = next(t for t in teams if t['nome'] == time_fora_nome)
 
+if st.button('Simular partida'):
+    placar_texto = st.empty()
+    eventos_container = st.container()
 
-def resumo_financeiro_mensal():
-    f = st.session_state.financas
-    receita_total = f["receita_tv"] + f["receita_bilheteria"] + f["patrocinios"]
-    despesa_total = f["despesa_salarios"] + f["despesa_outros"]
-    saldo = receita_total - despesa_total
-    return receita_total, despesa_total, saldo
+    gols_casa, gols_fora = 0, 0
+    eventos = []
 
+    for minuto in range(1, 91):
+        caos = random.random()
 
-# -----------------------------
-# Layout principal
-# -----------------------------
-st.set_page_config(page_title="Manager BR", layout="wide")
+        chance_casa = min(max((calcular_forca(time_casa) + 8) / 2200 + caos * 0.01, 0.01), 0.12)
+        chance_fora = min(max(calcular_forca(time_fora) / 2200 + (1 - caos) * 0.008, 0.01), 0.11)
 
-st.title("⚽ Manager BR - Protótipo")
-st.caption("Estilo Brassfoot/Footsim, com economia avançada em construção.")
+        if random.random() < chance_casa:
+            gols_casa += 1
+            eventos.append(f"GOL DO {time_casa_nome.upper()} aos {minuto} minutos!")
 
-# Seleção de clube
-st.sidebar.header("Configuração inicial")
-clube_escolhido = st.sidebar.selectbox(
-    "Escolha seu clube:",
-    [t["nome"] for t in TIMES_BASE],
-)
+        if random.random() < chance_fora:
+            gols_fora += 1
+            eventos.append(f"GOL DO {time_fora_nome.upper()} aos {minuto} minutos!")
 
-if st.sidebar.button("Iniciar com esse clube"):
-    inicializar_clube(clube_escolhido)
-    st.sidebar.success(f"Clube {clube_escolhido} carregado!")
+        if random.random() < 0.018:
+            eventos.append(f"Cartão amarelo aos {minuto} minutos. Entrada criminosa, porém futebolística.")
 
-# Tabs principais
-tab_dashboard, tab_elenco, tab_financas, tab_partidas = st.tabs(
-    ["📊 Dashboard", "👥 Elenco", "💰 Finanças", "🏟️ Partidas"]
-)
+        if random.random() < 0.008:
+            eventos.append(f"Lesão aos {minuto} minutos. A coxa foi de arrasta.")
 
-# -----------------------------
-# Dashboard
-# -----------------------------
-with tab_dashboard:
-    st.subheader("Visão geral do clube")
+        placar_texto.markdown(f"## {time_casa_nome} {gols_casa} x {gols_fora} {time_fora_nome}")
+        eventos_container.empty()
+        with eventos_container:
+            for ev in eventos:
+                st.write(f"- {ev}")
 
-    if not st.session_state.clube:
-        st.info("Escolha um clube na barra lateral para começar.")
-    else:
-        clube = st.session_state.clube
-        st.markdown(f"### {clube['nome']}")
-        col1, col2, col3 = st.columns(3)
+        time.sleep(0.05)  # velocidade da simulação
 
-        with col1:
-            st.metric("Liga", clube["liga"])
-            st.metric("Estado", clube["estado"])
-
-        receita_total, despesa_total, saldo = resumo_financeiro_mensal()
-        with col2:
-            st.metric("Receita mensal", f"R$ {receita_total:,.0f}")
-            st.metric("Despesas mensais", f"R$ {despesa_total:,.0f}")
-
-        with col3:
-            st.metric("Saldo projetado", f"R$ {saldo:,.0f}")
-            st.metric("Caixa atual", f"R$ {st.session_state.financas['caixa']:,.0f}")
-
-        st.markdown("#### Últimas partidas")
-        if st.session_state.historico_partidas:
-            st.table(st.session_state.historico_partidas[-5:])
-        else:
-            st.write("Nenhuma partida simulada ainda.")
-
-# -----------------------------
-# Elenco
-# -----------------------------
-with tab_elenco:
-    st.subheader("Elenco do clube")
-
-    if not st.session_state.elenco:
-        st.info("Elenco ainda não carregado. Inicie um clube na barra lateral.")
-    else:
-        st.table(st.session_state.elenco)
-
-# -----------------------------
-# Finanças
-# -----------------------------
-with tab_financas:
-    st.subheader("Gestão financeira")
-
-    f = st.session_state.financas
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("### Receitas")
-        st.write(f"TV: R$ {f['receita_tv']:,.0f}")
-        st.write(f"Bilheteria: R$ {f['receita_bilheteria']:,.0f}")
-        st.write(f"Patrocínios: R$ {f['patrocinios']:,.0f}")
-
-    with col2:
-        st.markdown("### Despesas")
-        st.write(f"Salários: R$ {f['despesa_salarios']:,.0f}")
-        st.write(f"Outros: R$ {f['despesa_outros']:,.0f}")
-
-    receita_total, despesa_total, saldo = resumo_financeiro_mensal()
-    st.markdown("---")
-    st.metric("Saldo mensal projetado", f"R$ {saldo:,.0f}")
-
-    st.markdown("### Ajustes rápidos")
-    novo_patrocinio = st.slider("Ajustar patrocínios (R$)", 1_000_000, 10_000_000, int(f["patrocinios"]))
-    if st.button("Aplicar novo patrocínio"):
-        st.session_state.financas["patrocinios"] = novo_patrocinio
-        st.success("Patrocínio atualizado.")
-
-# -----------------------------
-# Partidas
-# -----------------------------
-with tab_partidas:
-    st.subheader("Simulação de partidas")
-
-    if not st.session_state.clube:
-        st.info("Escolha um clube primeiro.")
-    else:
-        adversarios = [t["nome"] for t in TIMES_BASE if t["nome"] != st.session_state.clube["nome"]]
-        adversario = st.selectbox("Escolha o adversário:", adversarios)
-
-        if st.button("Simular partida"):
-            simular_partida(adversario)
-            st.success("Partida simulada! Veja o resultado no histórico abaixo.")
-
-        if st.session_state.historico_partidas:
-            st.markdown("### Histórico de partidas")
-            st.table(st.session_state.historico_partidas)
-        else:
-            st.write("Nenhuma partida simulada ainda.")
+    st.success("Fim de jogo! Se prepare para o próximo caos.")
